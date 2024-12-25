@@ -1,39 +1,44 @@
-# assessment-design
-Under the project has the terraform folder. It has the file listed below
+# Description For Task 1
 
-# 1.main below.tf          # Main Terraform configuration
-# 2.variables.tf           # Variables definitions
-# 3.terraform.tfvars       # Variable values (git-ignored for security)
-# 4.outputs.tf             # Outputs definitions (if required)
-# 5.versions.tf            # Provider and Terraform version constraints
+## Project Structure
 
-instead of that blow files also included
-# README.md                  # Project documentation and instructions
-# .gitignore                 # Ignore sensitive or unnecessary files
-========================================================================
-========================================================================
+Your Terraform project is organized as follows:
 
-### 4. Explain how you would automate the process using TFActions.
+### Terraform Files
+1. **`main.tf`**: Main Terraform configuration file.
+2. **`variables.tf`**: Defines input variables for the project.
+3. **`terraform.tfvars`**: Stores variable values (excluded from version control for security).
+4. **`outputs.tf`**: Specifies outputs (if required).
+5. **`versions.tf`**: Contains provider and Terraform version constraints.
 
-   Here's the Terraform code to achieve the described setup and an explanation of automating the process using TFActions.
+### Additional Files
+- **`README.md`**: Project documentation and instructions.
+- **`.gitignore`**: Excludes sensitive or unnecessary files from version control.
 
-##  Automating with TFActions
-      
-   TFActions simplifies running Terraform within GitHub Actions. Here’s how you would automate the process:
+---
 
-   Setup Repository: Store the Terraform code in a GitHub repository.
-   
-   there are two popular methods for authentication
-   
-# 1st method
+## Automating with TFActions
 
-   # 1 Create Secrets:
-GOOGLE_CREDENTIALS: JSON key for the GCP service account.
-GCP_PROJECT: Your GCP project ID.
-GCP_REGION: The region for resources.
+TFActions simplifies running Terraform workflows within GitHub Actions. Here’s how you can automate the process:
 
-Create a Workflow File: Add the following YAML file to .github/workflows/terraform.yml
------------------------------------------------------------------------------------------
+### Step 1: Setup Repository
+Store your Terraform code in a GitHub repository.
+
+### Step 2: Authentication Methods
+You can choose between two popular methods for authentication:
+
+#### **1. Using Service Account Keys**
+
+##### Create Secrets:
+Add the following secrets to your repository:
+- **`GOOGLE_CREDENTIALS`**: JSON key for the GCP service account.
+- **`GCP_PROJECT`**: Your GCP project ID.
+- **`GCP_REGION`**: The region for resources.
+
+##### Workflow File:
+Save the following YAML code as `.github/workflows/terraform.yml`:
+
+```yaml
 name: Terraform CI/CD
 
 on:
@@ -64,29 +69,29 @@ jobs:
         run: terraform init
 
       - name: Terraform Plan
-        run: terraform plan -var=\"project_id=${{ secrets.GCP_PROJECT }}\" -var=\"region=${{ secrets.GCP_REGION }}\"
+        run: terraform plan -var="project_id=${{ secrets.GCP_PROJECT }}" -var="region=${{ secrets.GCP_REGION }}"
 
       - name: Terraform Apply
         if: github.ref == 'refs/heads/main'
-        run: terraform apply -auto-approve -var=\"project_id=${{ secrets.GCP_PROJECT }}\" -var=\"region=${{ secrets.GCP_REGION }}\"
-# -------------------------------------------------------------------------
+        run: terraform apply -auto-approve -var="project_id=${{ secrets.GCP_PROJECT }}" -var="region=${{ secrets.GCP_REGION }}"
+```
 
+#### **2. Using Workload Identity Federation**
 
-# 2nd method
-Using Google Cloud Workload Identity Federation eliminates the need to manage and store long-lived service account keys. 
-Here’s how you can integrate it with the Terraform automation process:
+Eliminate the need to manage long-lived service account keys with this approach.
 
-# Steps to Configure Workload Identity Federation with GitHub Actions
+##### Steps to Configure Workload Identity Federation:
 
-1. Create a Workload Identity Pool: Use the gcloud CLI or Terraform to create the workload identity pool:
-
+1. **Create a Workload Identity Pool:**
+```bash
 gcloud iam workload-identity-pools create "github-pool" \
   --project="${GCP_PROJECT_ID}" \
   --location="global" \
   --display-name="GitHub Pool"
+```
 
-2. Create a Provider for the Pool: Link GitHub as the identity provider.
-
+2. **Create a Provider for the Pool:**
+```bash
 gcloud iam workload-identity-pools providers create-oidc "github-provider" \
   --project="${GCP_PROJECT_ID}" \
   --location="global" \
@@ -94,16 +99,20 @@ gcloud iam workload-identity-pools providers create-oidc "github-provider" \
   --display-name="GitHub Provider" \
   --attribute-mapping="google.subject=assertion.sub" \
   --issuer-uri="https://token.actions.githubusercontent.com"
+```
 
-3. Grant Permissions to Use the Workload Identity Pool: Bind the pool to your Google Cloud Service Account (GSA):
-
+3. **Grant Permissions to Use the Workload Identity Pool:**
+```bash
 gcloud iam service-accounts add-iam-policy-binding "${GSA_NAME}@${GCP_PROJECT_ID}.iam.gserviceaccount.com" \
   --project="${GCP_PROJECT_ID}" \
   --role="roles/iam.workloadIdentityUser" \
   --member="principalSet://iam.googleapis.com/projects/${GCP_PROJECT_ID}/locations/global/workloadIdentityPools/github-pool/attribute.repository/${GITHUB_REPOSITORY}"
+```
 
-4. Based on that create Terraform Workflow File: Modify .github/workflows/terraform.yml to use Workload Identity Federation:
+##### Workflow File:
+Save the following YAML code as `.github/workflows/terraform.yml`:
 
+```yaml
 name: Terraform CI/CD with Workload Identity Federation
 
 on:
@@ -140,18 +149,20 @@ jobs:
       - name: Terraform Apply
         if: github.ref == 'refs/heads/main'
         run: terraform apply -auto-approve -var="project_id=${{ secrets.GCP_PROJECT_ID }}" -var="region=${{ secrets.GCP_REGION }}"
+```
 
-# Main Points
-1.Secrets Setup:
-   Define GCP_PROJECT_ID and GSA_NAME in your repository secrets.
-2.Authentication:
-   The google-github-actions/auth action handles federated authentication without requiring a service account key.
-3.Workload Identity Provider:
-   Ensures GitHub Actions workflows can act as the identity and access resources securely.
+---
 
-# This approach enhances security and aligns with best practices by avoiding service account key files.
+## Key Points
 
+1. **Secrets Setup:**
+   - Define `GCP_PROJECT_ID` and `GSA_NAME` in your repository secrets.
 
+2. **Authentication:**
+   - The `google-github-actions/auth` action handles federated authentication without requiring service account keys.
 
+3. **Workload Identity Provider:**
+   - Securely integrates GitHub Actions workflows with GCP resources.
 
-
+By using TFActions and Workload Identity Federation, you enhance security and adhere to best practices for infrastructure automation.
+Also well the service account should have allocate the necessary permissions.
